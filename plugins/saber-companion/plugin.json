@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "saber-companion",
+  "version": "0.1.0",
+  "description": "Saber 骑士助手：中文角色风格与本地原生宠物。",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Saber 骑士助手",
+        "shortDescription": "角色风格与原生宠物",
+        "composerIcon": "./assets/saber-concept.png"
+      }
+    }
+  }
+}

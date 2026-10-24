@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'">
+<title>Saber · 本地角色预览</title>
+<link rel="icon" href="../assets/saber-concept.png" type="image/png">
+<style>
+  :root { color-scheme: light; font: 16px/1.6 system-ui, 'Microsoft YaHei', sans-serif; color: #17315a; background: #eef3fb; }
+  * { box-sizing: border-box; }
+  body { max-width: 1080px; margin: auto; padding: 32px 24px 48px; }
+  h1 { margin: 4px 0; font-size: 30px; }
+  h2 { font-size: 18px; margin: 0 0 12px; }
+  p { margin: 0 0 20px; }
+  .eyebrow { color: #536886; font-size: 12px; letter-spacing: .15em; margin: 0; }
+  .workbench { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+  .stage, .controls, .states { border: 1px solid #d6e0ef; border-radius: 16px; background: white; }
+  .stage { min-height: 340px; display: grid; place-content: center; justify-items: center; background: repeating-conic-gradient(#f6f8fc 0 25%, #fff 0 50%) 50% / 24px 24px; }
+  .stage.dark { background: #172237; color: #f1f5ff; }
+  .sprite { --scale: 1; width: calc(192px * var(--scale)); height: calc(208px * var(--scale)); background-image: url('../pets/saber-knight/spritesheet.png'); background-size: calc(1536px * var(--scale)) calc(1872px * var(--scale)); background-repeat: no-repeat; }
+  .frame { margin-top: 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .controls { padding: 24px; }
+  label { display: block; margin-bottom: 14px; }
+  select, button { font: inherit; border: 1px solid #bccbe0; border-radius: 8px; padding: 8px 12px; color: inherit; background: white; }
+  select { width: 100%; margin: 6px 0 14px; }
+  button { cursor: pointer; background: #234c92; color: white; margin-bottom: 18px; min-width: 100px; }
+  input { accent-color: #234c92; }
+  :focus-visible { outline: 3px solid #b57a19; outline-offset: 3px; }
+  .note { color: #52647f; font-size: 13px; margin: 0; }
+  .states { padding: 24px; margin-top: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .state { min-height: 150px; display: grid; justify-items: center; align-content: center; background: #f5f8fd; border-radius: 10px; padding: 12px; font-size: 13px; }
+  .state .sprite { --scale: .5; }
+  #error { color: #a62032; }
+  @media (max-width: 650px) { body { padding: 20px 16px; } .workbench { grid-template-columns: 1fr; } .grid { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 25px; } }
+</style>
+<p class="eyebrow">SABER COMPANION / LOCAL DEVELOPMENT</p>
+<h1>Saber · 骑士助手</h1>
+<p>Master，已就位。这是角色动画的本地开发预览。</p>
+<main>
+  <div class="workbench">
+    <div class="stage" id="stage">
+      <div class="sprite" id="hero" role="img" aria-label="Saber 角色动画" data-state="idle" data-frame="0"></div>
+      <div class="frame" id="frame" aria-live="off">正在加载精灵表…</div>
+    </div>
+    <section class="controls" aria-label="动画控制">
+      <h2>查看动作</h2>
+      <label for="state">角色状态<select id="state" disabled></select></label>
+      <button id="pause" type="button" aria-pressed="false">暂停动画</button>
+      <label><input id="dark" type="checkbox"> 深色背景</label>
+      <label><input id="still" type="checkbox"> 静态帧</label>
+      <p class="note">使用原生 v1 的九种动作。实际任务状态由 Codex 调度；此页仅检查素材与循环。</p>
+    </section>
+  </div>
+  <p id="error" role="alert" hidden></p>
+  <section class="states"><h2>全部动作</h2><div class="grid" id="grid"></div></section>
+</main>
+<script>
+  const hero = document.querySelector('#hero');
+  const select = document.querySelector('#state');
+  const pause = document.querySelector('#pause');
+  const still = document.querySelector('#still');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let paused = false, elapsed = 0, previous = performance.now(), selected = 'idle';
+  const draw = (element, animation, time, scale) => {
+    const total = animation.durations.reduce((a, b) => a + b, 0);
+    let remaining = time % total, column = 0;
+    if (!still.checked && !reduced.matches) {
+      while (column < animation.durations.length - 1 && remaining >= animation.durations[column]) {
+        remaining -= animation.durations[column++];
+      }
+    }
+    element.style.backgroundPosition = (-column * 192 * scale) + 'px ' + (-animation.row * 208 * scale) + 'px';
+    element.dataset.state = animation.state;
+    element.dataset.frame = column;
+    return column;
+  };
+  select.addEventListener('change', () => { selected = select.value; elapsed = 0; });
+  pause.addEventListener('click', () => {
+    paused = !paused;
+    pause.textContent = paused ? '播放动画' : '暂停动画';
+    pause.setAttribute('aria-pressed', String(paused));
+  });
+  document.querySelector('#dark').addEventListener('change', event => document.querySelector('#stage').classList.toggle('dark', event.target.checked));
+  (async () => {
+    const response = await fetch('../pets/saber-knight/animation.json');
+    if (!response.ok) throw Error('无法加载动作信息：HTTP ' + response.status);
+    const layout = await response.json();
+    const image = new Image();
+    image.src = '../pets/saber-knight/spritesheet.png';
+    await image.decode();
+    if (image.naturalWidth !== layout.width || image.naturalHeight !== layout.height) throw Error('精灵表尺寸与动作信息不一致');
+    const thumbnails = layout.animations.map(animation => {
+      const option = document.createElement('option');
+      option.value = animation.state; option.textContent = animation.label; select.append(option);
+      const item = document.createElement('div'); item.className = 'state';
+      const sprite = document.createElement('div'); sprite.className = 'sprite'; sprite.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span'); label.textContent = animation.label;
+      item.append(sprite, label); document.querySelector('#grid').append(item);
+      return [sprite, animation];
+    });
+    select.disabled = false;
+    document.body.dataset.ready = 'true';
+    const tick = now => {
+      if (!paused && !still.checked && !reduced.matches) elapsed += now - previous;
+      previous = now;
+      const animation = layout.animations.find(item => item.state === selected);
+      const frame = draw(hero, animation, elapsed, 1);
+      document.querySelector('#frame').textContent = animation.label + ' · ' + (frame + 1) + ' / ' + animation.durations.length;
+      for (const [sprite, item] of thumbnails) draw(sprite, item, elapsed, .5);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  })().catch(error => {
+    const output = document.querySelector('#error');
+    output.hidden = false;
+    output.textContent = error.message + '。请通过本地 HTTP 预览地址打开此页。';
+    console.error(error);
+  });
+</script>
+</html>

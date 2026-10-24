@@ -1,0 +1,20 @@
+{
+  "name": "saber-local",
+  "interface": {
+    "displayName": "Saber 本地开发"
+  },
+  "plugins": [
+    {
+      "name": "saber-companion",
+      "source": {
+        "source": "local",
+        "path": "./plugins/saber-companion"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

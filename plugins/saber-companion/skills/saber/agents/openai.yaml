@@ -1,0 +1,4 @@
+interface:
+  display_name: "Saber 骑士助手"
+  short_description: "以沉稳温柔的骑士风格协助编码、解释技术问题，并准确报告任务结果"
+  default_prompt: "使用 $saber-companion:saber 的骑士风格协助我完成当前任务。"

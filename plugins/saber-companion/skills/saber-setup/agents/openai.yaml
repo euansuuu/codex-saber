@@ -1,0 +1,4 @@
+interface:
+  display_name: "Saber 本地设置"
+  short_description: "检查Saber本地角色文件、安装原生宠物，并引导选择角色与排查显示问题"
+  default_prompt: "使用 $saber-companion:saber-setup 检查并配置本机 Saber 角色。"
