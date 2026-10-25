@@ -1,4 +1,5 @@
 import importlib.util
+from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
@@ -53,8 +54,41 @@ class LocalPackageTests(unittest.TestCase):
 
     def test_builder_rejects_opaque_art(self):
         layout = json.loads((PET / "animation.json").read_text(encoding="utf-8"))
+        sources = [Image.new("RGBA", (atlas["columns"] * 100, atlas["rows"] * 100), "white")
+                   for atlas in layout["sources"]]
         with self.assertRaises(ValueError):
-            builder.pack_sheet(Image.new("RGBA", (300, 400), "white"), layout)
+            builder.pack_sheet(sources, layout)
+
+    def test_builder_reproduces_sheet_with_distinct_original_actions(self):
+        layout = json.loads((PET / "animation.json").read_text(encoding="utf-8"))
+        with ExitStack() as stack:
+            sources = [stack.enter_context(Image.open(PLUGIN / "assets" / atlas["path"]))
+                       for atlas in layout["sources"]]
+            rebuilt = builder.pack_sheet(sources, layout)
+            packaged = stack.enter_context(Image.open(PET / "spritesheet.png"))
+            self.assertEqual(rebuilt.tobytes(), packaged.tobytes())
+        for state in ("idle", "waving", "failed", "waiting", "running", "review"):
+            animation = next(a for a in layout["animations"] if a["state"] == state)
+            row = animation["row"]
+            frames = {rebuilt.crop((c * 192, row * 208, (c + 1) * 192, (row + 1) * 208)).tobytes()
+                      for c in range(len(animation["durations"]))}
+            self.assertGreaterEqual(len(frames), 4, state)
+        running = next(a for a in layout["animations"] if a["state"] == "running")
+        self.assertTrue(set(running["poses"]) & set(range(20, 24)), "Missing sword execution")
+        self.assertTrue(set(running["poses"]) & set(range(24, 28)), "Missing search screens")
+        used = {pose for a in layout["animations"] for pose in a["poses"]}
+        self.assertTrue(set(range(12, 36)) <= used, "An original-design keyframe is never played")
+
+    def test_builder_rejects_missing_keyframes(self):
+        layout = json.loads((PET / "animation.json").read_text(encoding="utf-8"))
+        with ExitStack() as stack:
+            sources = [stack.enter_context(Image.open(PLUGIN / "assets" / atlas["path"]))
+                       for atlas in layout["sources"]]
+            sources[-1] = sources[-1].copy()
+            width, height = sources[-1].size
+            sources[-1].paste((0, 0, 0, 0), (round(width / 2), round(height / 2), width, height))
+            with self.assertRaisesRegex(ValueError, "Missing required pose"):
+                builder.pack_sheet(sources, layout)
 
     def test_pet_install_is_idempotent_and_preserves_edits(self):
         with tempfile.TemporaryDirectory(prefix="saber-pet-") as directory:
@@ -70,6 +104,38 @@ class LocalPackageTests(unittest.TestCase):
             outcome = subprocess.run(command, capture_output=True, text=True)
             self.assertNotEqual(outcome.returncode, 0)
             self.assertEqual(target.read_bytes(), changed)
+
+    def test_pet_upgrade_backs_up_old_files_before_replacing(self):
+        with tempfile.TemporaryDirectory(prefix="saber-upgrade-") as directory:
+            target = Path(directory) / "pets/saber-knight"
+            target.mkdir(parents=True)
+            old = {"pet.json": b'{"displayName":"my old Saber"}',
+                   "spritesheet.png": b"previous or customized sheet"}
+            for name, contents in old.items():
+                (target / name).write_bytes(contents)
+            command = ["powershell.exe", "-NoProfile", "-File", str(PLUGIN / "scripts/install-pet.ps1"),
+                       "-CodexDirectory", directory, "-Upgrade"]
+            for _ in range(2):
+                result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stderr)
+            backups = list((Path(directory) / "pets-backups/saber-knight").iterdir())
+            self.assertEqual(len(backups), 1, "Unchanged installs should not create another backup")
+            for name, contents in old.items():
+                self.assertEqual((backups[0] / name).read_bytes(), contents)
+                self.assertEqual((target / name).read_bytes(), (PET / name).read_bytes())
+
+    def test_install_reports_cloud_migration_instead_of_claiming_refresh_is_enough(self):
+        with tempfile.TemporaryDirectory(prefix="saber-cloud-") as directory:
+            state = {"electron-persisted-atom-state": {
+                "migrated-cloud-pet-ids-v1": {"test-account": {"custom:saber-knight": "pet_test"}}}}
+            (Path(directory) / ".codex-global-state.json").write_text(json.dumps(state), encoding="utf-8")
+            command = ["powershell.exe", "-NoProfile", "-File", str(PLUGIN / "scripts/install-pet.ps1"),
+                       "-CodexDirectory", directory]
+            result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Refresh does not replace cloud artwork", result.stdout)
+            self.assertIn("saber-companion:saber-setup", result.stdout)
+            self.assertEqual(json.loads((Path(directory) / ".codex-global-state.json").read_text()), state)
 
     def test_codex_installs_local_plugin_in_isolated_profile(self):
         node = shutil.which("node")

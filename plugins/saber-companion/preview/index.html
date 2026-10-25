@@ -31,17 +31,20 @@
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .state { min-height: 150px; display: grid; justify-items: center; align-content: center; background: #f5f8fd; border-radius: 10px; padding: 12px; font-size: 13px; }
   .state .sprite { --scale: .5; }
+  .trigger { color: #52647f; font-size: 12px; text-align: center; }
+  .stage.dark .trigger { color: #c0cee3; }
   #error { color: #a62032; }
   @media (max-width: 650px) { body { padding: 20px 16px; } .workbench { grid-template-columns: 1fr; } .grid { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 25px; } }
 </style>
 <p class="eyebrow">SABER COMPANION / LOCAL DEVELOPMENT</p>
 <h1>Saber · 骑士助手</h1>
-<p>Master，已就位。这是角色动画的本地开发预览。</p>
+<p>Master，已就位。六类原设计动作已绘制为连续关键帧。</p>
 <main>
   <div class="workbench">
     <div class="stage" id="stage">
       <div class="sprite" id="hero" role="img" aria-label="Saber 角色动画" data-state="idle" data-frame="0"></div>
       <div class="frame" id="frame" aria-live="off">正在加载精灵表…</div>
+      <div class="trigger" id="trigger"></div>
     </div>
     <section class="controls" aria-label="动画控制">
       <h2>查看动作</h2>
@@ -49,7 +52,7 @@
       <button id="pause" type="button" aria-pressed="false">暂停动画</button>
       <label><input id="dark" type="checkbox"> 深色背景</label>
       <label><input id="still" type="checkbox"> 静态帧</label>
-      <p class="note">使用原生 v1 的九种动作。实际任务状态由 Codex 调度；此页仅检查素材与循环。</p>
+      <p class="note">鼠标悬停在原生角色上会优先触发跳跃；移开后恢复任务动作。此页循环检查素材，原生窗口按实际状态触发。</p>
     </section>
   </div>
   <p id="error" role="alert" hidden></p>
@@ -96,7 +99,8 @@
       const item = document.createElement('div'); item.className = 'state';
       const sprite = document.createElement('div'); sprite.className = 'sprite'; sprite.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span'); label.textContent = animation.label;
-      item.append(sprite, label); document.querySelector('#grid').append(item);
+      const trigger = document.createElement('span'); trigger.className = 'trigger'; trigger.textContent = animation.trigger;
+      item.append(sprite, label, trigger); document.querySelector('#grid').append(item);
       return [sprite, animation];
     });
     select.disabled = false;
@@ -107,6 +111,7 @@
       const animation = layout.animations.find(item => item.state === selected);
       const frame = draw(hero, animation, elapsed, 1);
       document.querySelector('#frame').textContent = animation.label + ' · ' + (frame + 1) + ' / ' + animation.durations.length;
+      document.querySelector('#trigger').textContent = '原生触发：' + animation.trigger;
       for (const [sprite, item] of thumbnails) draw(sprite, item, elapsed, .5);
       requestAnimationFrame(tick);
     };

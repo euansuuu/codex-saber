@@ -9,7 +9,7 @@
   "animations": [
     {
       "state": "idle",
-      "label": "待机",
+      "label": "喝茶待机",
       "row": 0,
       "durations": [
         1680,
@@ -20,13 +20,14 @@
         1920
       ],
       "poses": [
-        0,
-        0,
-        1,
-        1,
-        0,
-        0
-      ]
+        12,
+        12,
+        13,
+        14,
+        15,
+        12
+      ],
+      "trigger": "没有待处理活动，或一次动作结束后"
     },
     {
       "state": "running-right",
@@ -51,7 +52,8 @@
         2,
         3,
         3
-      ]
+      ],
+      "trigger": "向右拖动角色"
     },
     {
       "state": "running-left",
@@ -76,11 +78,12 @@
         4,
         5,
         5
-      ]
+      ],
+      "trigger": "向左拖动角色"
     },
     {
       "state": "waving",
-      "label": "问候",
+      "label": "召唤问候",
       "row": 3,
       "durations": [
         140,
@@ -89,11 +92,12 @@
         280
       ],
       "poses": [
-        0,
-        6,
-        6,
-        0
-      ]
+        16,
+        17,
+        18,
+        19
+      ],
+      "trigger": "首次唤醒"
     },
     {
       "state": "jumping",
@@ -112,11 +116,12 @@
         7,
         7,
         0
-      ]
+      ],
+      "trigger": "鼠标悬停在角色上"
     },
     {
       "state": "failed",
-      "label": "异常",
+      "label": "异常求助",
       "row": 5,
       "durations": [
         140,
@@ -129,19 +134,20 @@
         240
       ],
       "poses": [
-        8,
-        8,
-        8,
-        8,
-        8,
-        8,
-        8,
-        8
-      ]
+        32,
+        33,
+        34,
+        35,
+        34,
+        33,
+        32,
+        35
+      ],
+      "trigger": "任务失败或系统错误"
     },
     {
       "state": "waiting",
-      "label": "等待确认",
+      "label": "思考检索 / 等待确认",
       "row": 6,
       "durations": [
         150,
@@ -152,17 +158,18 @@
         260
       ],
       "poses": [
-        9,
-        9,
-        9,
-        9,
-        9,
-        9
-      ]
+        24,
+        25,
+        26,
+        27,
+        25,
+        24
+      ],
+      "trigger": "等待用户回答或批准"
     },
     {
       "state": "running",
-      "label": "工作",
+      "label": "挥剑执行 / 光屏检索",
       "row": 7,
       "durations": [
         120,
@@ -173,17 +180,18 @@
         220
       ],
       "poses": [
-        10,
-        10,
-        10,
-        10,
-        10,
-        10
-      ]
+        20,
+        21,
+        22,
+        23,
+        24,
+        26
+      ],
+      "trigger": "聊天正在工作；挥剑与检索依次播放"
     },
     {
       "state": "review",
-      "label": "检查结果",
+      "label": "任务完成 / 举剑庆祝",
       "row": 8,
       "durations": [
         150,
@@ -194,13 +202,51 @@
         280
       ],
       "poses": [
-        11,
-        11,
-        11,
-        11,
-        11,
-        11
-      ]
+        28,
+        29,
+        30,
+        30,
+        31,
+        28
+      ],
+      "trigger": "任务完成且结果尚未读"
+    }
+  ],
+  "sources": [
+    {
+      "path": "saber-poses-source.png",
+      "columns": 3,
+      "rows": 4
+    },
+    {
+      "path": "saber-idle-frames.png",
+      "columns": 2,
+      "rows": 2
+    },
+    {
+      "path": "saber-waving-frames.png",
+      "columns": 2,
+      "rows": 2
+    },
+    {
+      "path": "saber-running-frames.png",
+      "columns": 2,
+      "rows": 2
+    },
+    {
+      "path": "saber-thinking-frames.png",
+      "columns": 2,
+      "rows": 2
+    },
+    {
+      "path": "saber-review-frames.png",
+      "columns": 2,
+      "rows": 2
+    },
+    {
+      "path": "saber-failed-frames.png",
+      "columns": 2,
+      "rows": 2
     }
   ]
 }

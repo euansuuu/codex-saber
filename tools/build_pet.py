@@ -1,6 +1,6 @@
-"""Assemble generated poses into a Codex v1 animation sheet."""
+"""Pack generated keyframes into the native Codex v1 animation sheet."""
+from contextlib import ExitStack
 import json
-import math
 from pathlib import Path
 
 from PIL import Image
@@ -9,21 +9,29 @@ ROOT = Path(__file__).resolve().parents[1]
 PET = ROOT / "plugins/saber-companion/pets/saber-knight"
 
 
-def pack_sheet(source, layout):
-    if source.mode != "RGBA" or source.getextrema()[3] != (0, 255):
-        raise ValueError("Source needs genuine transparent and opaque RGBA pixels.")
-    width, height = source.size
-    if width < 96 or height < 128 or abs(width / height / 0.75 - 1) > 0.05:
-        raise ValueError("Source must be a readable 3 by 4 pose atlas.")
+def pack_sheet(sources, layout):
+    if len(sources) != len(layout["sources"]):
+        raise ValueError("Source image and atlas counts differ.")
     poses = []
-    for index in range(12):
-        column, row = index % 3, index // 3
-        pose = source.crop((round(column * width / 3), round(row * height / 4),
-                            round((column + 1) * width / 3), round((row + 1) * height / 4)))
-        bounds = pose.getchannel("A").point(lambda alpha: 255 if alpha >= 32 else 0).getbbox()
-        if bounds is None:
-            raise ValueError(f"Missing required pose: {index}")
-        poses.append(pose.crop(bounds))
+    for source, atlas in zip(sources, layout["sources"]):
+        if source.mode != "RGBA" or source.getextrema()[3] != (0, 255):
+            raise ValueError("Source needs genuine transparent and opaque RGBA pixels.")
+        width, height = source.size
+        columns, rows = atlas["columns"], atlas["rows"]
+        if min(width / columns, height / rows) < 96 or abs(width / height / (columns / rows) - 1) > .05:
+            raise ValueError("Source must match its readable equal-cell atlas grid.")
+        for index in range(columns * rows):
+            column, row = index % columns, index // columns
+            pose = source.crop((round(column * width / columns), round(row * height / rows),
+                                round((column + 1) * width / columns), round((row + 1) * height / rows)))
+            bounds = pose.getchannel("A").point(lambda alpha: 255 if alpha >= 32 else 0).getbbox()
+            if bounds is None:
+                raise ValueError(f"Missing required pose: {atlas['path']} cell {index}")
+            pose = pose.crop(bounds)
+            # Normalize cell sizes before applying one shared character scale.
+            normalize = 360 / (width / columns)
+            poses.append(pose.resize((max(1, round(pose.width * normalize)),
+                                      max(1, round(pose.height * normalize))), Image.Resampling.LANCZOS))
     scale = min(156 / max(p.width for p in poses), 170 / max(p.height for p in poses))
     poses = [p.resize((max(1, round(p.width * scale)), max(1, round(p.height * scale))),
                       Image.Resampling.LANCZOS) for p in poses]
@@ -32,15 +40,12 @@ def pack_sheet(source, layout):
         row = animation["row"]
         if len(animation["poses"]) != len(animation["durations"]):
             raise ValueError("Pose and duration counts differ.")
+        # shortcut: held keyframes; draw in-betweens when smoother motion is needed.
         for column, pose_index in enumerate(animation["poses"]):
+            if not 0 <= pose_index < len(poses):
+                raise ValueError(f"Unknown pose index: {pose_index}")
             frame = poses[pose_index]
-            phase = column / len(animation["poses"]) * math.tau
-            offset_y = round(math.sin(phase) * 2)
-            if animation["state"] == "jumping":
-                offset_y = [0, -6, -14, -6, 0][column]
-            elif animation["state"] == "failed":
-                frame = frame.rotate(math.sin(phase) * 2, Image.Resampling.BICUBIC, expand=True)
-            # shortcut: pose swaps and small transforms; use drawn in-betweens for richer motion.
+            offset_y = [0, -6, -14, -6, 0][column] if animation["state"] == "jumping" else 0
             x = column * layout["cellWidth"] + (layout["cellWidth"] - frame.width) // 2
             y = row * layout["cellHeight"] + 194 - frame.height + offset_y
             sheet.alpha_composite(
@@ -51,9 +56,10 @@ def pack_sheet(source, layout):
 
 if __name__ == "__main__":
     layout = json.loads((PET / "animation.json").read_text(encoding="utf-8"))
-    source_path = ROOT / "plugins/saber-companion/assets/saber-poses-source.png"
-    with Image.open(source_path) as source:
-        sheet = pack_sheet(source, layout)
+    with ExitStack() as stack:
+        sources = [stack.enter_context(Image.open(ROOT / "plugins/saber-companion/assets" / atlas["path"]))
+                   for atlas in layout["sources"]]
+        sheet = pack_sheet(sources, layout)
     target = PET / "spritesheet.png"
     sheet.save(target)
     print(f"Packed {sum(len(a['durations']) for a in layout['animations'])} frames: {target}")

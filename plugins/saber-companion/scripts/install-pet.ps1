@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$CodexDirectory)
+param([string]$CodexDirectory, [switch]$Upgrade)
 
 $ErrorActionPreference = 'Stop'
 if (-not $CodexDirectory) {
@@ -28,6 +28,7 @@ if (Test-Path -LiteralPath $targetDirectory) {
     }
 }
 $files = @('spritesheet.png', 'pet.json')
+$changedFiles = @()
 foreach ($file in $files) {
     $target = Join-Path $targetDirectory $file
     if (Test-Path -LiteralPath $target) {
@@ -41,16 +42,45 @@ foreach ($file in $files) {
             $packagedHash = [Convert]::ToBase64String($hasher.ComputeHash([IO.File]::ReadAllBytes((Join-Path $sourceDirectory $file))))
         } finally { $hasher.Dispose() }
         if ($existingHash -ne $packagedHash) {
-            throw "Existing Saber files differ. Back up your changes before replacing: $target"
+            $changedFiles += $file
         }
     }
+}
+if ($changedFiles.Count -gt 0) {
+    if (-not $Upgrade) {
+        throw "Existing Saber files differ. Use -Upgrade to back up and replace: $targetDirectory"
+    }
+    $backupName = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+    $backupDirectory = Join-Path $CodexDirectory "pets-backups/saber-knight/$backupName"
+    New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
+    foreach ($file in $files) {
+        $existing = Join-Path $targetDirectory $file
+        if (Test-Path -LiteralPath $existing) {
+            Copy-Item -LiteralPath $existing -Destination (Join-Path $backupDirectory $file)
+        }
+    }
+    Write-Output "Previous Saber files backed up: $backupDirectory"
 }
 New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
 foreach ($file in $files) {
     $target = Join-Path $targetDirectory $file
-    if (-not (Test-Path -LiteralPath $target)) {
-        Copy-Item -LiteralPath (Join-Path $sourceDirectory $file) -Destination $target
+    if ($file -in $changedFiles -or -not (Test-Path -LiteralPath $target)) {
+        Copy-Item -LiteralPath (Join-Path $sourceDirectory $file) -Destination $target -Force
     }
 }
 Write-Output "Pet installed: $targetDirectory"
 Write-Output 'In Codex: Settings > Pets > Refresh > Saber. Use /pet to show it.'
+$statePath = Join-Path $CodexDirectory '.codex-global-state.json'
+if (Test-Path -LiteralPath $statePath) {
+    try {
+        $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $migrations = $state.'electron-persisted-atom-state'.'migrated-cloud-pet-ids-v1'
+        $cloudCopy = $migrations.PSObject.Properties | Where-Object { $_.Value.'custom:saber-knight' -like 'pet_*' }
+        if ($cloudCopy) {
+            Write-Output 'Saber has a migrated cloud copy. Refresh does not replace cloud artwork.'
+            Write-Output 'Ask $saber-companion:saber-setup to sync the active Saber artwork while preserving its pet ID.'
+        }
+    } catch {
+        Write-Warning 'Local files are installed, but cloud-migration status could not be read. Check the active Saber in Pets.'
+    }
+}
