@@ -52,6 +52,30 @@ $saber-companion:saber-setup 请安装本机 Saber 角色
 
 角色素材已随插件打包，安装时无需重新生成图片，也无需安装构建用的 Python/Pillow。市场名称保留为 `saber-local`，与现有本地安装兼容。仓库安装功能基于 [Codex 官方插件机制](https://developers.openai.com/plugins/build/plugins)。
 
+## npm 安装宠物外观
+
+Saber 已发布到 [Codex Pets 社区目录](https://codex-pet.org/pets/saber-artoria/)，创作者为 `euan-su`。有 Node.js/npm 的用户可直接执行：
+
+```powershell
+npx codex-pet-installer add saber-artoria
+```
+
+随后在 **Settings → Pets → Refresh** 中选择 **Saber**，用 `/pet` 显示。此命令只安装角色外观，骑士对话技能仍按上文的 GitHub 插件方式安装。站点上的 `saber` 属于其他创作者，请使用完整的 `saber-artoria` 标识。
+
+已于 2026-10-26 使用真实的 `npx --yes codex-pet-installer@0.1.1 add saber-artoria` 在隔离配置目录验证安装成功，下载图集与本仓库 0.2.0 PNG 的 RGBA 像素一致。
+
+### 维护社区发布包
+
+生成符合该站点上传格式的文件：
+
+```powershell
+python .\tools\package_gallery.py
+```
+
+输出 `output/gallery/saber-artoria/pet.json`、`spritesheet.webp` 及 `output/gallery/saber-artoria.codex-pet.zip`。WebP 使用无损编码，并逐像素校验与现有 PNG 一致；原生角色和插件文件保持原样。后续更新需到 [Creator Studio](https://codex-pet.org/studio/) 登录发布账号并编辑现有 Saber 条目，上传这两个新文件。
+
+本地重新打包不会自动更新社区目录。发布及安装验证记录保存在本地 `output/gallery/`，不包含在插件运行包中。
+
 ## 本地安装
 
 在此目录执行：
